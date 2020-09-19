@@ -143,8 +143,13 @@ class MSRX(object):
 
   def __init__(self, device):
     '''Open the serial device'''
-    import serial
-    self._dev = serial.Serial(device, 9600, 8, serial.PARITY_NONE)
+    if device == "usb":
+      from .msr605x import MSR605X
+      self._dev = MSR605X()
+      self._dev.connect()
+    else:
+      import serial
+      self._dev = serial.Serial(device, 9600, 8, serial.PARITY_NONE)
 
   def _send(self, d):
     self._dev.write(d)
