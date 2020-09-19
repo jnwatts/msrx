@@ -212,6 +212,13 @@ class MSRX(object):
     self._send(b'?\x1c')
     self._handle_status()
 
+  def raw(self, data):
+    msg = b'\x1b' + data.encode('UTF-8')
+    print(msg)
+    self._send(msg)
+    result = self._dev.recv_message(2500)
+    print(result)
+
   def _handle_status(self):
     self._expect(b'\x1b')
     status = self._dev.read(1)
@@ -273,6 +280,9 @@ def _do_write(args):
 def _do_erase(args):
 
   args.msrx.erase(args.tracks)
+
+def _do_raw(args):
+  args.msrx.raw(args.data)
 
 def main():
 
@@ -373,6 +383,19 @@ def main():
          + ','.join(str(i + 1) for i in range(_TRACK_CNT))
   )
   parser_a.set_defaults(func=_do_erase)
+
+  parser_a = subparsers.add_parser(
+    'raw',
+    description='Raw command',
+    help='Perform raw command'
+  )
+  parser_a.add_argument(
+    '-d', '--data',
+    metavar='DATA',
+    type=unicode,
+    help='data to write - overrides stdin'
+  )
+  parser_a.set_defaults(func=_do_raw)
 
   args = parser.parse_args()
   args.parser = parser
