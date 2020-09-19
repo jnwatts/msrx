@@ -166,6 +166,14 @@ class MSRX(object):
     '''Reset device to initial state'''
     self._send(b'\x1ba')
 
+  def hico(self):
+    '''set high coercion'''
+    self._send(b'\x1bx')
+
+  def loco(self):
+    '''set low coercion'''
+    self._send(b'\x1by')
+
   def erase(self, tracks=(True, True, True)):
     '''Erase tracks
 
@@ -335,6 +343,12 @@ def main():
     help='do NOT issue reset before the main command'
   )
   parser.add_argument(
+    '-H', '--hico',
+    action='store_true',
+    default=False,
+    help='Set Hi-Coercitivity mode'
+  )
+  parser.add_argument(
     '--version',
     action='store_true',
     help='show license and version of ' + __progname__
@@ -404,8 +418,14 @@ def main():
     msrxinst = MSRX(args.dev)
     if not args.no_reset:
       msrxinst.reset()
+    if args.hico:
+      msrxinst.hico()
+
     args.msrx = msrxinst
     args.func(args)
+
+    if args.hico: # Return to low-coercion
+      msrxinst.loco()
   except OSError as e:
     print(
       '%s: error: %s' % (__progname__, os.strerror(e.errno)),
