@@ -62,6 +62,7 @@ _DEF_DEV = '/dev/ttyUSB0'
 _DEV_ENV = 'MSRX_DEV'
 _DELIM = '|'
 _DEF_TYPE = 'iso'
+_RAW = True
 
 class ISO7811(object):
 
@@ -195,19 +196,45 @@ class MSRX(object):
     Read all tracks
     '''
     tracks = [b''] * _TRACK_CNT
-    self._send(b'\x1bm')
+    if _RAW:
+      self._send(b'\x1bm') # RAW
+    else:
+      self._send(b'\x1br') # ASCII
     self._expect(b'\x1bs')
-    for t in range(_TRACK_CNT):
-      self._expect(b'\x1b' + to_byte(t + 1))
-      tracks[t] = b''.join(
-        # Some bit hackery to reverse the bits - we shouldn't need this
-        # but the hardware works in mysterious ways.
-        to_byte((((ord(c) * 0x80200802)
-                & 0x0884422110) * 0x0101010101 >> 32) & 255)
-        for c in biter(self._dev.read(ord(self._dev.read(1))))
-      )
-    self._expect(b'?\x1c')
-    self._handle_status()
+
+    while True:
+      d = self._dev.read(1)
+
+      if d == b'?':
+        self._expect(b'\x1c')
+        self._handle_status()
+        break
+
+      elif d == b'\x1b':
+        d = self._dev.read(1)
+
+        if ord(d) <= _TRACK_CNT:
+          t = ord(d) - 1;
+          # print("Track", t + 1)
+
+          while True:
+            d = self._dev.read(1)
+
+            if d == b'\x1b':
+              d = self._dev.read(1)
+              # print(" ERR? <ESC>", d)
+              break
+
+            elif d == b'%' or d == b';':
+              continue
+
+            elif d == b'?':
+              # print(" ",tracks[t])
+              # print(" ",binascii.hexlify(tracks[t]))
+              break
+
+            tracks[t] += d
+
     return tracks
 
   def write(self, tracks):
@@ -216,9 +243,15 @@ class MSRX(object):
     tracks: tuple of three byte strings, each data for the corresponding
             track. To preserve a track, pass empty byte string.
     '''
-    self._send(b'\x1bn\x1bs')
+    if _RAW:
+      self._send(b'\x1bn\x1bs') # RAW
+    else:
+      self._send(b'\x1bw\x1bs') # ASCII
     for t, i in zip(tracks, range(_TRACK_CNT)):
-      self._send(b'\x1b' + to_byte(i + 1) + to_byte(len(t)) + t)
+      if _RAW:
+        self._send(b'\x1b' + to_byte(i + 1) + to_byte(len(t)) + t)
+      else:
+        self._send(b'\x1b' + to_byte(i + 1) + t)
     self._send(b'?\x1c')
     self._handle_status()
 
@@ -242,12 +275,8 @@ class MSRX(object):
       )
 
 _DATA_CONV = {
-  ('raw', 'hex'):
-    (lambda d, _: codecs.encode(d, 'hex_codec')),
-  ('hex', 'raw'): (lambda d, _: codecs.decode(d, 'hex_codec')),
-  ('raw', 'iso'):
-    (lambda d, t: codecs.encode(d, 'iso7811-t%d' % t)),
-  ('iso', 'raw'): (lambda d, t: codecs.decode(d, 'iso7811-t%d' % t))
+  ('raw_ascii', 'ascii'): (lambda d, _: d.decode("utf-8")),
+  ('ascii', 'raw_ascii'): (lambda d, _: d.encode("utf-8")),
   ('raw', 'hex'): (lambda d, _: binascii.hexlify(d).decode("utf-8")),
   ('hex', 'raw'): (lambda d, _: binascii.hexlify(d).decode("utf-8")),
   ('raw', 'iso'): (lambda d, t: codecs.encode(d, 'iso7811-t%d' % t)),
@@ -255,21 +284,26 @@ _DATA_CONV = {
 }
 
 _DTYPE_VFY = {
+  'ascii': lambda d, _: bool(re.search(r'^[\x00-\x7F]*$', d)),
   'hex': lambda d, _: bool(re.search(r'^[0-9a-fA-F]*$', d)),
-  'iso': lambda d, t: bool(
-    re.search(r'^[ -_]*$' if t == 1 else r'^[0-?]*$', d)
-  )
+  'iso': lambda d, t: bool(re.search(r'^[ -_]*$' if t == 1 else r'^[0-?]*$', d)),
 }
 
 def _do_read(args):
-
+  if _RAW:
+    fmt = 'raw'
+  else:
+    fmt = 'raw_ascii'
   print(_DELIM.join(
-    _DATA_CONV[('raw', args.type)](d, t + 1)
+    _DATA_CONV[(fmt, args.type)](d, t + 1)
     for d, t in zip(args.msrx.read(), range(_TRACK_CNT))
   ))
 
 def _do_write(args):
-
+  if _RAW:
+    fmt = 'raw'
+  else:
+    fmt = 'raw_ascii'
   data = (args.data or input()).split(_DELIM)
   if len(data) != _TRACK_CNT:
     args.parser.error(
@@ -286,7 +320,7 @@ def _do_write(args):
     )
 
   data = [
-    _DATA_CONV[args.type, 'raw'](d, t + 1)
+    _DATA_CONV[args.type, fmt](d, t + 1)
     for d, t in zip(data, range(_TRACK_CNT))
   ]
   args.msrx.write(data)
