@@ -23,6 +23,7 @@ from __future__ import unicode_literals
 
 import argparse
 import codecs
+import binascii
 import os
 import re
 import sys
@@ -159,7 +160,8 @@ class MSRX(object):
     rd = self._dev.read(len(d))
     if rd != d:
       raise ProtocolError('expected %s, got %s' % (
-        codecs.encode(rd, 'hex_codec'), codecs.encode(d, 'hex_encode')
+        binascii.hexlify(d).decode("utf-8"),
+        binascii.hexlify(rd).decode("utf-8")
       ))
 
   def reset(self):
@@ -236,7 +238,7 @@ class MSRX(object):
       raise DeviceError(self._DEV_ERR[status])
     else:
       raise ProtocolError(
-        "invalid status %s" % codec.encode(status, 'hex_codec')
+        "invalid status %s" % binascii.hexlify(status).decode("utf-8")
       )
 
 _DATA_CONV = {
@@ -246,6 +248,10 @@ _DATA_CONV = {
   ('raw', 'iso'):
     (lambda d, t: codecs.encode(d, 'iso7811-t%d' % t)),
   ('iso', 'raw'): (lambda d, t: codecs.decode(d, 'iso7811-t%d' % t))
+  ('raw', 'hex'): (lambda d, _: binascii.hexlify(d).decode("utf-8")),
+  ('hex', 'raw'): (lambda d, _: binascii.hexlify(d).decode("utf-8")),
+  ('raw', 'iso'): (lambda d, t: codecs.encode(d, 'iso7811-t%d' % t)),
+  ('iso', 'raw'): (lambda d, t: codecs.decode(d, 'iso7811-t%d' % t)),
 }
 
 _DTYPE_VFY = {
