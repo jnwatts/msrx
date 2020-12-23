@@ -156,11 +156,20 @@ class MSR605X:
         self.buffer = b''
     def write(self, d):
         self.send_message(d)
-    def read(self, count):
+    def read(self, count=0):
         buf_len = len(self.buffer)
-        if count > buf_len:
-            new_data = self.recv_message()
-            self.buffer = self.buffer + new_data
-        ret = self.buffer[:count]
-        self.buffer = self.buffer[count:]
+        if count == 0:
+            timeout = 100
+        else:
+            timeout = 0
+        if count > buf_len or count == 0:
+            new_data = self.recv_message(timeout)
+            if not new_data is None:
+                self.buffer = self.buffer + new_data
+        if count == 0:
+            ret = self.buffer
+            self.buffer = b''
+        else:
+            ret = self.buffer[:count]
+            self.buffer = self.buffer[count:]
         return ret
