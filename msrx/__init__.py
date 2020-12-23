@@ -61,8 +61,8 @@ _TRACK_CNT = 3
 _DEF_DEV = '/dev/ttyUSB0'
 _DEV_ENV = 'MSRX_DEV'
 _DELIM = '|'
-_DEF_TYPE = 'iso'
-_RAW = True
+_DEF_TYPE = 'ascii'
+_RAW = False
 
 class ISO7811(object):
 
