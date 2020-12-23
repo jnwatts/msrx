@@ -458,8 +458,13 @@ def main():
 
   try:
     msrxinst = MSRX(args.dev)
+
+    # Clear any data pending from a previous command
+    msrxinst._dev.read(0)
+
     if not args.no_reset:
       msrxinst.reset()
+
     if args.hico:
       msrxinst.hico()
 
