@@ -172,10 +172,12 @@ class MSRX(object):
   def hico(self):
     '''set high coercion'''
     self._send(b'\x1bx')
+    self._handle_status()
 
   def loco(self):
     '''set low coercion'''
     self._send(b'\x1by')
+    self._handle_status()
 
   def erase(self, tracks=(True, True, True)):
     '''Erase tracks
